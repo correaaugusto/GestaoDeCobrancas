@@ -1,0 +1,152 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum Papel {
+  DONO
+  FINANCEIRO
+  ATENDENTE
+}
+
+enum TipoItem {
+  SERVICO
+  PECA
+}
+
+enum StatusConfirmacao {
+  AGUARDANDO
+  CONFIRMADA
+  CONTESTADA
+}
+
+enum StatusCobranca {
+  ABERTA
+  PAGA
+  CANCELADA
+}
+
+model Usuario {
+  id        String   @id @default(cuid())
+  nome      String
+  email     String   @unique
+  senhaHash String
+  papel     Papel    @default(ATENDENTE)
+  ativo     Boolean  @default(true)
+  criadoEm  DateTime @default(now())
+
+  ordensCriadas  OrdemServico[] @relation("OsCriadaPor")
+  pagamentosBaixados OrdemServico[] @relation("OsPagamentoPor")
+}
+
+model Cliente {
+  id                 String   @id @default(cuid())
+  razaoSocial        String
+  nomeFantasia       String?
+  cnpj               String?  @unique
+  telefone           String?  // WhatsApp do financeiro da empresa
+  email              String?
+  prazoPagamentoDias Int      @default(0)
+  observacoes        String?
+  ativo              Boolean  @default(true)
+  criadoEm           DateTime @default(now())
+
+  ordens OrdemServico[]
+}
+
+// Arquivos enviados (assinatura, documento do veículo, NF, comprovante).
+// O conteúdo fica no storage (disco local ou Supabase); aqui só a referência.
+model Arquivo {
+  id       String   @id @default(cuid())
+  chave    String   @unique
+  nome     String
+  mimeType String
+  tamanho  Int
+  criadoEm DateTime @default(now())
+
+  osAssinatura        OrdemServico? @relation("OsAssinatura")
+  osDocumentoVeiculo  OrdemServico? @relation("OsDocumentoVeiculo")
+  osNotaFiscal        OrdemServico? @relation("OsNotaFiscal")
+  osComprovante       OrdemServico? @relation("OsComprovante")
+}
+
+model OrdemServico {
+  id     String @id @default(cuid())
+  numero Int    @unique @default(autoincrement())
+
+  clienteId   String
+  cliente     Cliente @relation(fields: [clienteId], references: [id])
+  criadoPorId String
+  criadoPor   Usuario @relation("OsCriadaPor", fields: [criadoPorId], references: [id])
+
+  dataServico DateTime @default(now())
+  observacoes String?
+
+  // Dados de quem trouxe o veículo
+  motoristaNome      String
+  motoristaDocumento String?
+  placa              String
+  veiculoDescricao   String?
+
+  // Valores em centavos para evitar erro de arredondamento
+  totalCentavos Int
+  itens         ItemOS[]
+
+  assinaturaId        String?  @unique
+  assinatura          Arquivo? @relation("OsAssinatura", fields: [assinaturaId], references: [id])
+  documentoVeiculoId  String?  @unique
+  documentoVeiculo    Arquivo? @relation("OsDocumentoVeiculo", fields: [documentoVeiculoId], references: [id])
+
+  // Link público enviado para a empresa confirmar o serviço
+  tokenPublico        String            @unique
+  statusConfirmacao   StatusConfirmacao @default(AGUARDANDO)
+  confirmacaoEm       DateTime?
+  confirmacaoNome     String?
+  confirmacaoIp       String?
+  contestacaoMotivo   String?
+
+  // Cobrança
+  statusCobranca     StatusCobranca @default(ABERTA)
+  vencimento         DateTime?      @db.Date
+  notaFiscalNumero   String?
+  notaFiscalId       String?        @unique
+  notaFiscal         Arquivo?       @relation("OsNotaFiscal", fields: [notaFiscalId], references: [id])
+  cobrancaEnviadaEm  DateTime?
+
+  // Pagamento
+  pagoEm             DateTime?      @db.Date
+  valorPagoCentavos  Int?
+  comprovanteId      String?        @unique
+  comprovante        Arquivo?       @relation("OsComprovante", fields: [comprovanteId], references: [id])
+  pagamentoPorId     String?
+  pagamentoPor       Usuario?       @relation("OsPagamentoPor", fields: [pagamentoPorId], references: [id])
+
+  canceladaEm        DateTime?
+  cancelamentoMotivo String?
+
+  criadoEm     DateTime @default(now())
+  atualizadoEm DateTime @updatedAt
+
+  @@index([clienteId])
+  @@index([statusCobranca, vencimento])
+  @@index([dataServico])
+}
+
+model ItemOS {
+  id                    String   @id @default(cuid())
+  osId                  String
+  os                    OrdemServico @relation(fields: [osId], references: [id], onDelete: Cascade)
+  tipo                  TipoItem
+  descricao             String
+  quantidade            Float
+  valorUnitarioCentavos Int
+  subtotalCentavos      Int
+
+  @@index([osId])
+  @@index([tipo, descricao])
+}

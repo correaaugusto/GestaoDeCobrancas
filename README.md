@@ -1,36 +1,76 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Controle de OS
 
-## Getting Started
+Sistema web que substitui o "fiado" em papel: o atendente registra a ordem de serviço no celular
+(com assinatura do motorista e foto do documento do veículo), o financeiro cobra pelo WhatsApp com
+um link onde a empresa cliente confere o PDF e confirma o serviço, e o dono acompanha no painel
+quanto faturou, recebeu e quem está devendo.
 
-First, run the development server:
+## Funcionalidades
+
+- **Ordem de serviço pelo celular** — empresa, placa, motorista, serviços e peças, foto/PDF do CRLV
+  (fotos são comprimidas no próprio aparelho) e assinatura do motorista na tela.
+- **PDF da OS** — dados, itens, assinatura, QR code de confirmação e o documento do veículo anexado
+  (imagem vira uma página; CRLV em PDF tem as páginas juntadas ao final).
+- **Link de confirmação** — a empresa abre o link (sem login), vê os itens, baixa o PDF e a NF e
+  confirma ou contesta o serviço. Fica registrado nome, data/hora e IP.
+- **Cobrança** — vencimento calculado pelo prazo de cada cliente, número e arquivo da NF, botão que
+  abre o WhatsApp com a mensagem pronta (cobrança ou lembrete de atraso).
+- **Pagamento** — anexar comprovante marca a OS como paga automaticamente.
+- **Painel do dono** — faturado e recebido no mês, a receber, vencido, cobranças atrasadas,
+  clientes que mais devem, peças vendidas e serviços realizados.
+- **Perfis de acesso** — Atendente (registra OS), Financeiro (cobranças) e Dono (tudo + usuários).
+
+## Stack
+
+Next.js 16 (App Router, Server Actions, Cache Components) · TypeScript · Tailwind CSS 4 ·
+PostgreSQL + Prisma · `@react-pdf/renderer` + `pdf-lib` · sessão com JWT (`jose`) em cookie httpOnly ·
+armazenamento de arquivos em disco local ou Supabase Storage.
+
+## Rodando localmente
+
+Requisitos: Node 20+ e PostgreSQL.
 
 ```bash
+cp .env.example .env        # preencha DATABASE_URL, DIRECT_URL e SESSION_SECRET
+npm install
+npm run db:migrate          # cria as tabelas
+npm run db:seed             # usuários e dados de exemplo
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Acesse http://localhost:3000. Usuários de exemplo (senha `123456`):
+`dono@exemplo.com`, `financeiro@exemplo.com`, `atendente@exemplo.com`.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+Para testar no celular na mesma rede, acesse pelo IP do computador e ajuste `APP_URL`.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+## Deploy (Vercel + Supabase)
 
-## Learn More
+1. Crie um projeto no Supabase. Em *Storage*, crie um bucket **privado** chamado `arquivos`.
+2. Na Vercel, importe o repositório e configure as variáveis do `.env.example` com
+   `STORAGE_DRIVER=supabase`, a `SUPABASE_SERVICE_ROLE_KEY` e `APP_URL` com o domínio final.
+3. Rode `npm run db:deploy` apontando para o banco de produção e crie o primeiro usuário
+   (ex.: rodando o seed uma vez e trocando a senha do dono em *Usuários*).
 
-To learn more about Next.js, take a look at the following resources:
+> A Vercel limita o corpo de cada requisição a ~4,5 MB. As fotos já são reduzidas no navegador,
+> mas PDFs grandes de NF/comprovante podem passar disso.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+## Estrutura
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```
+prisma/schema.prisma        modelo de dados (Usuário, Cliente, OrdemServico, ItemOS, Arquivo)
+src/proxy.ts                redireciona quem não está logado / sem permissão
+src/lib/auth.ts             sessão e checagem de papel (usado por páginas e actions)
+src/lib/storage.ts          upload/leitura de arquivos (local ou Supabase)
+src/lib/pdf/                geração do PDF da OS
+src/app/actions/            Server Actions (login, clientes, OS, usuários)
+src/app/(app)/              telas internas (painel, OS, clientes, usuários)
+src/app/confirmar/[token]   página pública de confirmação
+src/app/api/                download de PDF e arquivos
+```
 
-## Deploy on Vercel
+## Próximos passos
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- Pagamento parcial e várias OS numa mesma cobrança (fatura mensal por cliente)
+- Lembrete automático de vencimento
+- Emissão de NFS-e integrada (ex.: Focus NFe / NFE.io)
+- Relatórios exportáveis (Excel/PDF)
