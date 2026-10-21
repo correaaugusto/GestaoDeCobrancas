@@ -30,5 +30,5 @@ export async function proxy(request: NextRequest) {
 
 export const config = {
   // Rotas públicas: página de confirmação do cliente e seus arquivos.
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|confirmar|api/publico).*)"],
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|confirmar|api/publico|api/saude).*)"],
 };
