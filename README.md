@@ -45,11 +45,19 @@ Para testar no celular na mesma rede, acesse pelo IP do computador e ajuste `APP
 
 ## Deploy (Vercel + Supabase)
 
-1. Crie um projeto no Supabase. Em *Storage*, crie um bucket **privado** chamado `arquivos`.
-2. Na Vercel, importe o repositório e configure as variáveis do `.env.example` com
-   `STORAGE_DRIVER=supabase`, a `SUPABASE_SERVICE_ROLE_KEY` e `APP_URL` com o domínio final.
-3. Rode `npm run db:deploy` apontando para o banco de produção e crie o primeiro usuário
-   (ex.: rodando o seed uma vez e trocando a senha do dono em *Usuários*).
+1. **Supabase** — crie um projeto (região *South America (São Paulo)*). Em *Connect*, copie:
+   - *Transaction pooler* (porta 6543) → `DATABASE_URL`, acrescentando `?pgbouncer=true&connection_limit=1`
+   - *Session pooler* (porta 5432) → `DIRECT_URL`
+   - Em *Project Settings → API Keys*, a chave secreta (`service_role` / `sb_secret_…`) → `SUPABASE_SERVICE_ROLE_KEY`
+   - A URL do projeto (`https://xxxx.supabase.co`) → `SUPABASE_URL`
+2. **Vercel** — importe o repositório e configure as variáveis:
+   `DATABASE_URL`, `DIRECT_URL`, `SESSION_SECRET`, `STORAGE_DRIVER=supabase`, `SUPABASE_URL`,
+   `SUPABASE_SERVICE_ROLE_KEY` e os dados `EMPRESA_*`.
+3. Faça o deploy. O build cria/atualiza as tabelas (`prisma migrate deploy`) e o bucket de arquivos
+   é criado no primeiro upload.
+4. Abra o site: na primeira visita aparece a tela de **primeiro acesso** para criar o usuário dono.
+
+`APP_URL` é opcional na Vercel (usa o domínio de produção do projeto); defina-o se usar domínio próprio.
 
 > A Vercel limita o corpo de cada requisição a ~4,5 MB. As fotos já são reduzidas no navegador,
 > mas PDFs grandes de NF/comprovante podem passar disso.

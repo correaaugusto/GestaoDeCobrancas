@@ -34,3 +34,29 @@ export async function sair() {
   (await cookies()).delete(COOKIE_SESSAO);
   redirect("/login");
 }
+
+export type EstadoPrimeiroAcesso = { erro?: string };
+
+const esquemaDono = z.object({
+  nome: z.string().trim().min(2, "Informe seu nome"),
+  email: z.string().trim().toLowerCase().email("E-mail inválido"),
+  senha: z.string().min(8, "A senha precisa ter pelo menos 8 caracteres"),
+});
+
+// Só funciona enquanto o banco não tem nenhum usuário (instalação nova).
+export async function criarPrimeiroDono(_: EstadoPrimeiroAcesso, formData: FormData): Promise<EstadoPrimeiroAcesso> {
+  const dados = esquemaDono.safeParse(Object.fromEntries(formData));
+  if (!dados.success) return { erro: dados.error.issues[0].message };
+
+  const { senha, ...resto } = dados.data;
+  const senhaHash = await bcrypt.hash(senha, 10);
+  const usuario = await db.$transaction(async (tx) => {
+    if ((await tx.usuario.count()) > 0) return null;
+    return tx.usuario.create({ data: { ...resto, senhaHash, papel: "DONO" } });
+  });
+  if (!usuario) redirect("/login");
+
+  const token = await criarToken({ uid: usuario.id, papel: usuario.papel });
+  (await cookies()).set(COOKIE_SESSAO, token, opcoesCookie);
+  redirect("/painel");
+}

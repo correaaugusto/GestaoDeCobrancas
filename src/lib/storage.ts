@@ -40,9 +40,14 @@ export async function salvarArquivo(file: File, prefixo: string) {
   const chave = `${prefixo}/${Date.now()}-${randomBytes(6).toString("hex")}.${EXTENSOES[file.type]}`;
 
   if (driver === "supabase") {
-    const { error } = await supabase()
-      .storage.from(bucket)
-      .upload(chave, conteudo, { contentType: file.type });
+    const cliente = supabase();
+    const enviar = () => cliente.storage.from(bucket).upload(chave, conteudo, { contentType: file.type });
+    let { error } = await enviar();
+    // Primeiro upload em um projeto novo: cria o bucket (privado) e tenta de novo.
+    if (error && /bucket not found/i.test(error.message)) {
+      await cliente.storage.createBucket(bucket, { public: false });
+      ({ error } = await enviar());
+    }
     if (error) throw new Error(`Falha ao enviar arquivo: ${error.message}`);
   } else {
     const destino = path.join(pastaLocal, chave);

@@ -1,4 +1,7 @@
+import { Suspense } from "react";
 import type { Metadata } from "next";
+import { redirect } from "next/navigation";
+import { db } from "@/lib/db";
 import { FormLogin } from "./form-login";
 
 export const metadata: Metadata = { title: "Entrar" };
@@ -15,7 +18,16 @@ export default function PaginaLogin() {
           <p className="text-sm text-zinc-500">Ordens de serviço e cobranças</p>
         </div>
         <FormLogin />
+        <Suspense>
+          <InstalacaoNova />
+        </Suspense>
       </div>
     </main>
   );
+}
+
+// Banco recém-criado sem usuários: manda para o cadastro do dono.
+async function InstalacaoNova() {
+  if ((await db.usuario.count()) === 0) redirect("/primeiro-acesso");
+  return null;
 }

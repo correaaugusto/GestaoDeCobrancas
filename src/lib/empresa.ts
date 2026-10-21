@@ -7,5 +7,8 @@ export const empresa = {
 };
 
 export function urlApp() {
-  return (process.env.APP_URL ?? "http://localhost:3000").replace(/\/$/, "");
+  // Na Vercel, sem APP_URL definido, usa o domínio de produção do projeto.
+  const vercel = process.env.VERCEL_PROJECT_PRODUCTION_URL;
+  const url = process.env.APP_URL || (vercel ? `https://${vercel}` : "http://localhost:3000");
+  return url.replace(/\/$/, "");
 }

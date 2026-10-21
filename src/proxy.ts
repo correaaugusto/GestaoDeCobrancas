@@ -7,7 +7,7 @@ export async function proxy(request: NextRequest) {
   const sessao = await lerToken(request.cookies.get(COOKIE_SESSAO)?.value);
   const { pathname } = request.nextUrl;
 
-  if (pathname === "/login") {
+  if (pathname === "/login" || pathname === "/primeiro-acesso") {
     return sessao ? NextResponse.redirect(new URL("/", request.url)) : NextResponse.next();
   }
 
